@@ -358,14 +358,9 @@ static PF_Err ParamsSetupController(
   AEFX_CLR_STRUCT(def);
   def.flags = PF_ParamFlag_SUPERVISE | PF_ParamFlag_CANNOT_INTERP;
 
-  PF_ADD_POPUP("Flavor",
-      (A_short)InstanceType::INSTANCE_SIZE,
-      (A_short)InstanceType::INSTANCE_ZERO,
-      "(-|"
-      "Float|"
-      "Float2D|"
-      "Float3D",
-      (A_long)ControllerItems::CONTROLLER_FLAVOR);
+  PF_ADD_BUTTON("AddParam1d", "Add Param 1d", 0, PF_ParamFlag_SUPERVISE, (A_long)ControllerItems::CONTROLLER_ADD_1D);
+  PF_ADD_BUTTON("AddParam2d", "Add Param 2d", 0, PF_ParamFlag_SUPERVISE, (A_long)ControllerItems::CONTROLLER_ADD_2D);
+  PF_ADD_BUTTON("AddParam3d", "Add Param 3d", 0, PF_ParamFlag_SUPERVISE, (A_long)ControllerItems::CONTROLLER_ADD_3D);
 
   out_data->num_params = (A_long)ControllerItems::CONTROLLER_NUM_ITEMS;
 
@@ -433,33 +428,39 @@ static PF_Err UserChangedParamController(PF_InData* in_data,
     PF_LayerDef* outputP,
     PF_UserChangedParamExtra* extra)
 {
-  // Check if the user has selected anything from the drop down
   PF_Err err = PF_Err_NONE;
 
   AEGP_SuiteHandler suites(in_data->pica_basicP);
 
-  int flavor = (int)ControllerItems::CONTROLLER_FLAVOR;
-  if (extra->param_index == flavor)
+  AEGP_LayerH layer;
+  suites.LayerSuite7()->AEGP_GetActiveLayer(&layer);
+  if (!layer)
   {
-    AEGP_LayerH layer;
-    suites.LayerSuite7()->AEGP_GetActiveLayer(&layer);
-    if (layer)
-    {
-      const PF_ParamDef* p = params[extra->param_index];
-      int val = p->u.pd.value;
-      if (val > 1 && val <= 4)
-      {
-        // Find the effect key, and apply it to the current layer
-        const char* suffix[] = {"-", "-", "1d", "2d", "3d"};
-        AEGP_EffectRefH effect;
-        AEGP_InstalledEffectKey key = g_effectKeys[string("ParamInstance") + suffix[val]];
-        suites.EffectSuite3()->AEGP_ApplyEffect(g_pluginIdController, layer, key, &effect);
-        suites.EffectSuite3()->AEGP_DisposeEffect(effect);
-      }
-    }
+    return err;
   }
 
-  // TODO: reset the drop down
+  if (extra->param_index == (int)ControllerItems::CONTROLLER_ADD_1D)
+  {
+    AEGP_EffectRefH effect;
+    AEGP_InstalledEffectKey key = g_effectKeys["ParamInstance1d"];
+    suites.EffectSuite3()->AEGP_ApplyEffect(g_pluginIdController, layer, key, &effect);
+    suites.EffectSuite3()->AEGP_DisposeEffect(effect);
+  }
+  else if (extra->param_index == (int)ControllerItems::CONTROLLER_ADD_2D)
+  {
+    AEGP_EffectRefH effect;
+    AEGP_InstalledEffectKey key = g_effectKeys["ParamInstance2d"];
+    suites.EffectSuite3()->AEGP_ApplyEffect(g_pluginIdController, layer, key, &effect);
+    suites.EffectSuite3()->AEGP_DisposeEffect(effect);
+  }
+
+  else if (extra->param_index == (int)ControllerItems::CONTROLLER_ADD_3D)
+  {
+    AEGP_EffectRefH effect;
+    AEGP_InstalledEffectKey key = g_effectKeys["ParamInstance3d"];
+    suites.EffectSuite3()->AEGP_ApplyEffect(g_pluginIdController, layer, key, &effect);
+    suites.EffectSuite3()->AEGP_DisposeEffect(effect);
+  }
 
   return err;
 }
