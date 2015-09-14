@@ -36,7 +36,7 @@ bool g_initialized = Init();
 
 struct Value
 {
-  Value() {}
+  Value() : x(0), y(0), z(0) {}
   Value(float x, float y = 0, float z = 0) : x(x), y(y), z(z) {}
 
   friend bool operator==(const Value& lhs, const Value& rhs)
@@ -617,7 +617,8 @@ static PF_Err UIParamChangedInstance(
               }
               else
               {
-                streamName = layerName + "." + streamName;
+                // append the layer name if it's not empty
+                streamName = layerName.empty() ? streamName : layerName + "." + streamName;
               }
             }
 
@@ -642,21 +643,35 @@ static PF_Err UIParamChangedInstance(
             suites.KeyframeSuite4()->AEGP_GetKeyframeTime(
                 streamRef, lastIdx, AEGP_LTimeMode_LayerTime, &lastKeyTime);
 
-            AEGP_StreamValue2 firstKeyValue, lastKeyValue;
-            suites.KeyframeSuite4()->AEGP_GetNewKeyframeValue(
+            // TODO: figure out if the values are from keyframes or expressions
+
+            // if we just have a single keyframe, assume it's an expression, and sample
+            // from 0 to duration
+
+            if (numKeyframes > 1)
+            {
+              AEGP_StreamValue2 firstKeyValue, lastKeyValue;
+
+              suites.KeyframeSuite4()->AEGP_GetNewKeyframeValue(
                 g_pluginIdInstance, streamRef, firstIdx, &firstKeyValue);
-            suites.KeyframeSuite4()->AEGP_GetNewKeyframeValue(
+              suites.KeyframeSuite4()->AEGP_GetNewKeyframeValue(
                 g_pluginIdInstance, streamRef, lastIdx, &lastKeyValue);
 
-            keyframes.firstTime = firstKeyTime.value / (float)firstKeyTime.scale;
-            keyframes.lastTime = lastKeyTime.value / (float)lastKeyTime.scale;
-            keyframes.firstValue = ValueFromStreamValue(streamType, firstKeyValue);
-            keyframes.lastValue = ValueFromStreamValue(streamType, lastKeyValue);
+              keyframes.firstTime = firstKeyTime.value / (float)firstKeyTime.scale;
+              keyframes.lastTime = lastKeyTime.value / (float)lastKeyTime.scale;
+              keyframes.firstValue = ValueFromStreamValue(streamType, firstKeyValue);
+              keyframes.lastValue = ValueFromStreamValue(streamType, lastKeyValue);
+
+              suites.StreamSuite4()->AEGP_DisposeStreamValue(&firstKeyValue);
+              suites.StreamSuite4()->AEGP_DisposeStreamValue(&lastKeyValue);
+            }
+            else
+            {
+              firstKeyTime.value = 0;
+              lastKeyTime = duration;
+            }
 
             float lastTime = (float)lastKeyTime.value / lastKeyTime.scale;
-
-            suites.StreamSuite4()->AEGP_DisposeStreamValue(&firstKeyValue);
-            suites.StreamSuite4()->AEGP_DisposeStreamValue(&lastKeyValue);
 
             switch (streamType)
             {
@@ -676,7 +691,7 @@ static PF_Err UIParamChangedInstance(
             {
               AEGP_StreamValue2 val;
               suites.StreamSuite4()->AEGP_GetNewStreamValue(
-                  g_pluginIdInstance, streamRef, AEGP_LTimeMode_LayerTime, &curTime, TRUE, &val);
+                  g_pluginIdInstance, streamRef, AEGP_LTimeMode_LayerTime, &curTime, FALSE, &val);
 
               keyframes.values.push_back(ValueFromStreamValue(streamType, val));
 
