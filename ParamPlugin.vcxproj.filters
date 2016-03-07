@@ -15,6 +15,8 @@
     </ClCompile>
     <ClCompile Include="ParamPlugin.cpp" />
     <ClCompile Include="utils.cpp" />
+    <ClCompile Include="server.cpp" />
+    <ClCompile Include="precompiled.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(AE_PLUGIN_EXAMPLES)\Headers\A.h">
@@ -91,6 +93,8 @@
     </ClInclude>
     <ClInclude Include="ParamPlugin.hpp" />
     <ClInclude Include="utils.hpp" />
+    <ClInclude Include="server.hpp" />
+    <ClInclude Include="precompiled.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="AE">

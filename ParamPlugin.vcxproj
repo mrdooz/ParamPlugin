@@ -68,7 +68,7 @@
     <_ProjectFileVersion>12.0.30501.0</_ProjectFileVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(Platform)\$(Configuration)\</OutDir>
+    <OutDir>C:\Program Files\Adobe\Adobe After Effects CS6\Support Files\Plug-ins\Effects\</OutDir>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <IgnoreImportLibrary>true</IgnoreImportLibrary>
     <LinkIncremental>true</LinkIncremental>
@@ -121,6 +121,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>Default</CompileAs>
+      <ForcedIncludeFiles>precompiled.hpp</ForcedIncludeFiles>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -128,7 +129,7 @@
     </ResourceCompile>
     <Link>
       <ShowProgress>NotSet</ShowProgress>
-      <OutputFile>$(Platform)\$(Configuration)\$(ProjectName).aex</OutputFile>
+      <OutputFile>C:\Program Files\Adobe\Adobe After Effects CS6\Support Files\Plug-ins\Effects\$(ProjectName).aex</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ProgramDatabaseFile>$(Platform)\$(Configuration)\$(ProjectName).pdb</ProgramDatabaseFile>
@@ -170,6 +171,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>Default</CompileAs>
       <WholeProgramOptimization>true</WholeProgramOptimization>
+      <ForcedIncludeFiles>precompiled.hpp</ForcedIncludeFiles>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -309,6 +311,8 @@
     <ClInclude Include="$(AE_PLUGIN_EXAMPLES)\Util\PF_Suite_Helper.h" />
     <ClInclude Include="$(AE_PLUGIN_EXAMPLES)\Util\Smart_Utils.h" />
     <ClInclude Include="$(AE_PLUGIN_EXAMPLES)\Util\String_Utils.h" />
+    <ClInclude Include="precompiled.hpp" />
+    <ClInclude Include="server.hpp" />
     <ClInclude Include="utils.hpp" />
     <ClInclude Include="ParamPlugin.hpp" />
   </ItemGroup>
@@ -341,7 +345,12 @@ cl /D "MSWindows" /EP $(IntDir)%(Filename).rrc &gt;               "$(ProjectDir)
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="$(AE_PLUGIN_EXAMPLES)\Util\AEFX_SuiteHelper.c" />
+    <ClCompile Include="$(AE_PLUGIN_EXAMPLES)\Util\AEFX_SuiteHelper.c">
+      <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </ForcedIncludeFiles>
+      <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </ForcedIncludeFiles>
+    </ClCompile>
     <ClCompile Include="$(AE_PLUGIN_EXAMPLES)\Util\AEGP_SuiteHandler.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Disabled</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Disabled</Optimization>
@@ -355,11 +364,47 @@ cl /D "MSWindows" /EP $(IntDir)%(Filename).rrc &gt;               "$(ProjectDir)
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">MSWindows;WIN32;_DEBUG;_WINDOWS</PreprocessorDefinitions>
       <BrowseInformation Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BrowseInformation>
       <BrowseInformation Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</BrowseInformation>
+      <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </ForcedIncludeFiles>
+      <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </ForcedIncludeFiles>
     </ClCompile>
-    <ClCompile Include="$(AE_PLUGIN_EXAMPLES)\Util\MissingSuiteError.cpp" />
-    <ClCompile Include="$(AE_PLUGIN_EXAMPLES)\Util\Smart_Utils.cpp" />
-    <ClCompile Include="utils.cpp" />
-    <ClCompile Include="ParamPlugin.cpp" />
+    <ClCompile Include="$(AE_PLUGIN_EXAMPLES)\Util\MissingSuiteError.cpp">
+      <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </ForcedIncludeFiles>
+      <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="$(AE_PLUGIN_EXAMPLES)\Util\Smart_Utils.cpp">
+      <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </ForcedIncludeFiles>
+      <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="precompiled.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">precompiled.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">precompiled.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="server.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">precompiled.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">precompiled.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="utils.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">precompiled.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">precompiled.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="ParamPlugin.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">precompiled.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">precompiled.hpp</PrecompiledHeaderFile>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ParamPluginPiPL.rc" />

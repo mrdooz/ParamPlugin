@@ -1,78 +1,22 @@
-#include "utils.hpp"
-#include <string>
-#include <vector>
-#include <unordered_map>
-#include <unordered_set>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-
 #include "ParamPlugin.hpp"
+#include "server.hpp"
+#include "utils.hpp"
 
 // Need to link with Ws2_32.lib
 #pragma comment(lib, "ws2_32.lib")
 
-using namespace std;
-
 AEGP_PluginID g_pluginIdController;
 AEGP_PluginID g_pluginIdInstance;
 
-CRITICAL_SECTION g_cs;
-CONDITION_VARIABLE g_cv;
+unordered_map<string, Keyframes> g_keyframes;
+unordered_set<string> g_newKeyframes;
 
-char g_sendbuffer[16 * 1024 * 1024];
-DWORD g_threadId = 0;
+static PF_State g_controllerParamStates[(int)ControllerItems::CONTROLLER_NUM_ITEMS] = {0};
+static PF_State g_instanceParamStates[(int)InstanceItems::INSTANCE_NUM_ITEMS] = {0};
+static unordered_map<string, AEGP_InstalledEffectKey> g_effectKeys;
 
-DWORD ServerThread(void* params);
-
-bool Init()
-{
-  InitializeCriticalSection(&g_cs);
-  InitializeConditionVariable(&g_cv);
-  CreateThread(NULL, 0, ServerThread, NULL, 0, &g_threadId);
-  return true;
-}
-
-bool g_initialized = Init();
-
-struct Value
-{
-  Value() : x(0), y(0), z(0) {}
-  Value(float x, float y = 0, float z = 0) : x(x), y(y), z(z) {}
-
-  friend bool operator==(const Value& lhs, const Value& rhs)
-  {
-    return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z;
-  }
-
-  float x, y, z;
-};
-
-struct Keyframes
-{
-  string name;
-  int dims = 0;
-  Value firstValue;
-  Value lastValue;
-  float firstTime = 0;
-  float lastTime = 0;
-  float sampleStep;
-  vector<Value> values;
-
-  friend bool operator==(const Keyframes& lhs, const Keyframes& rhs) { return lhs.values == rhs.values; }
-
-  friend bool operator!=(const Keyframes& lhs, const Keyframes& rhs) { return !(lhs == rhs); }
-
-  int ToBuffer(char* buf) const;
-};
-
-template <typename T>
-int CopyToBuffer(char* buf, const T& t)
-{
-  memcpy(buf, &t, sizeof(t));
-  return sizeof(t);
-}
-
-int ValueToBuffer(char* buf, const Value& v, int dims)
+//------------------------------------------------------------------------------
+static int ValueToBuffer(char* buf, const Value& v, int dims)
 {
   char* org = buf;
   switch (dims)
@@ -92,6 +36,7 @@ int ValueToBuffer(char* buf, const Value& v, int dims)
   return (int)(buf - org);
 }
 
+//------------------------------------------------------------------------------
 int Keyframes::ToBuffer(char* buf) const
 {
   const char* orgBuf = buf;
@@ -135,15 +80,7 @@ int Keyframes::ToBuffer(char* buf) const
   return (int)(buf - orgBuf);
 }
 
-unordered_map<string, Keyframes> g_keyframes;
-unordered_set<string> g_newKeyframes;
-
-PF_State g_controllerParamStates[(int)ControllerItems::CONTROLLER_NUM_ITEMS] = {0};
-PF_State g_instanceParamStates[(int)InstanceItems::INSTANCE_NUM_ITEMS] = {0};
-
-unordered_map<string, AEGP_InstalledEffectKey> g_effectKeys;
-bool g_firstSend = true;
-
+//------------------------------------------------------------------------------
 string StringFromMemHandle(AEGP_SuiteHandler& suites, AEGP_MemHandle h)
 {
   LPCWSTR w;
@@ -161,125 +98,6 @@ static PF_Err About(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* param
   PF_SPRINTF(out_data->return_msg, "%s, v%d.%d\r%s", NAME, MAJOR_VERSION, MINOR_VERSION, DESCRIPTION);
 
   return PF_Err_NONE;
-}
-
-//------------------------------------------------------------------------------
-DWORD ServerThread(void* params)
-{
-  WSADATA wsaData;
-  int res = WSAStartup(MAKEWORD(2, 2), &wsaData);
-  if (res != NO_ERROR)
-  {
-    wprintf(L"WSAStartup() failed with error: %d\n", res);
-    return 1;
-  }
-
-  // Create a SOCKET for listening for incoming connection requests.
-  SOCKET listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-  if (listenSocket == INVALID_SOCKET)
-  {
-    wprintf(L"socket function failed with error: %ld\n", WSAGetLastError());
-    WSACleanup();
-    return 1;
-  }
-
-  // The sockaddr_in structure specifies the address family,
-  // IP address, and port for the socket that is being bound.
-  sockaddr_in service;
-  service.sin_family = AF_INET;
-  service.sin_addr.s_addr = inet_addr("127.0.0.1");
-  service.sin_port = htons(1337);
-
-  res = bind(listenSocket, (SOCKADDR*)&service, sizeof(service));
-  if (res == SOCKET_ERROR)
-  {
-    // wprintf(L"bind function failed with error %d\n", WSAGetLastError());
-    res = closesocket(listenSocket);
-    if (res == SOCKET_ERROR)
-      wprintf(L"closesocket function failed with error %d\n", WSAGetLastError());
-    WSACleanup();
-    return 1;
-  }
-
-  // Listen for incoming connection requests
-  // on the created socket
-  while (true)
-  {
-    if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR)
-    {
-      wprintf(L"listen function failed with error: %d\n", WSAGetLastError());
-      return 1;
-    }
-
-    wprintf(L"Listening on socket...\n");
-
-    // Accept a client socket
-    SOCKET clientSocket = accept(listenSocket, NULL, NULL);
-    if (clientSocket == INVALID_SOCKET)
-    {
-      printf("accept failed: %d\n", WSAGetLastError());
-      closesocket(listenSocket);
-      WSACleanup();
-      return 1;
-    }
-
-    while (true)
-    {
-      // check if there are any new keyframes to send
-      EnterCriticalSection(&g_cs);
-
-      char* buf = g_sendbuffer;
-      // write a dummy 0 to the buffer that we'll fill in with the true payload
-      // size when we know it
-      int dummy = 0;
-      buf += CopyToBuffer(buf, dummy);
-
-      if (g_firstSend)
-      {
-        // if first, connect, send everything
-        buf += CopyToBuffer(buf, (int)g_keyframes.size());
-        for (auto kv : g_keyframes)
-        {
-          const Keyframes& keyframe = kv.second;
-          buf += keyframe.ToBuffer(buf);
-        }
-      }
-      else
-      {
-        while (g_newKeyframes.empty())
-        {
-          SleepConditionVariableCS(&g_cv, &g_cs, INFINITE);
-        }
-
-        // New keyframes. Copy them to a flat buffer, and send them to the client
-        buf += CopyToBuffer(buf, (int)g_newKeyframes.size());
-        for (const string& keyframes : g_newKeyframes)
-        {
-          const Keyframes& keyframe = g_keyframes[keyframes];
-          buf += keyframe.ToBuffer(buf);
-        }
-
-        g_newKeyframes.clear();
-      }
-
-      LeaveCriticalSection(&g_cs);
-
-      // write the final payload size to the start of the buffer
-      int bytesToSend = (int)(buf - g_sendbuffer);
-      CopyToBuffer(g_sendbuffer, bytesToSend);
-
-      // send to the client
-      int res = send(clientSocket, g_sendbuffer, bytesToSend, 0);
-      if (res == SOCKET_ERROR)
-      {
-        // client dc:ed, so break out of the send loop, and wait for them to connect again
-        break;
-      }
-    }
-  }
-
-  WSACleanup();
-  return 0;
 }
 
 //------------------------------------------------------------------------------
@@ -358,9 +176,12 @@ static PF_Err ParamsSetupController(
   AEFX_CLR_STRUCT(def);
   def.flags = PF_ParamFlag_SUPERVISE | PF_ParamFlag_CANNOT_INTERP;
 
-  PF_ADD_BUTTON("AddParam1d", "Add Param 1d", 0, PF_ParamFlag_SUPERVISE, (A_long)ControllerItems::CONTROLLER_ADD_1D);
-  PF_ADD_BUTTON("AddParam2d", "Add Param 2d", 0, PF_ParamFlag_SUPERVISE, (A_long)ControllerItems::CONTROLLER_ADD_2D);
-  PF_ADD_BUTTON("AddParam3d", "Add Param 3d", 0, PF_ParamFlag_SUPERVISE, (A_long)ControllerItems::CONTROLLER_ADD_3D);
+  PF_ADD_BUTTON(
+      "AddParam1d", "Add Param 1d", 0, PF_ParamFlag_SUPERVISE, (A_long)ControllerItems::CONTROLLER_ADD_1D);
+  PF_ADD_BUTTON(
+      "AddParam2d", "Add Param 2d", 0, PF_ParamFlag_SUPERVISE, (A_long)ControllerItems::CONTROLLER_ADD_2D);
+  PF_ADD_BUTTON(
+      "AddParam3d", "Add Param 3d", 0, PF_ParamFlag_SUPERVISE, (A_long)ControllerItems::CONTROLLER_ADD_3D);
 
   out_data->num_params = (A_long)ControllerItems::CONTROLLER_NUM_ITEMS;
 
@@ -653,9 +474,9 @@ static PF_Err UIParamChangedInstance(
               AEGP_StreamValue2 firstKeyValue, lastKeyValue;
 
               suites.KeyframeSuite4()->AEGP_GetNewKeyframeValue(
-                g_pluginIdInstance, streamRef, firstIdx, &firstKeyValue);
+                  g_pluginIdInstance, streamRef, firstIdx, &firstKeyValue);
               suites.KeyframeSuite4()->AEGP_GetNewKeyframeValue(
-                g_pluginIdInstance, streamRef, lastIdx, &lastKeyValue);
+                  g_pluginIdInstance, streamRef, lastIdx, &lastKeyValue);
 
               keyframes.firstTime = firstKeyTime.value / (float)firstKeyTime.scale;
               keyframes.lastTime = lastKeyTime.value / (float)lastKeyTime.scale;
@@ -752,10 +573,6 @@ PF_Err EntryPointFuncController(PF_Cmd cmd,
     case PF_Cmd_USER_CHANGED_PARAM:
       err = UserChangedParamController(in_dataP, out_data, params, output, (PF_UserChangedParamExtra*)extra);
       break;
-
-      // case PF_Cmd_UPDATE_PARAMS_UI:
-      //  err = UIParamChangedController(in_dataP, out_data, params, output, extra);
-      //  break;
   }
   return err;
 }
